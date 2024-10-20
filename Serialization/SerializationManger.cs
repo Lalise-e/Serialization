@@ -27,10 +27,16 @@ namespace Serialization
 			startLoad();
 			if (obj == null)
 				return ((LEB128)0).GetBytes();
-			if (!_propertyInfos.ContainsKey(obj.GetType()))
-				throw new Exception($"class {obj.GetType()} is missing {nameof(ClassSerializationAttribute)}");
-
 			List<byte> result = [];
+			if (!_propertyInfos.ContainsKey(obj.GetType()))
+			{
+				if (!_serializers.ContainsKey(obj.GetType()))
+				throw new Exception($"class {obj.GetType()} is missing {nameof(ClassSerializationAttribute)}");
+				result.AddRange(((LEB128)(-1)).GetBytes());
+				result.AddRange(serializeObject(obj.GetType().AssemblyQualifiedName, true));
+				result.AddRange(serializeObject(obj, true));
+				return result.ToArray();
+			}
 
 			ClassSerializationAttribute? classAtt =
 				obj.GetType().GetCustomAttribute<ClassSerializationAttribute>();
@@ -54,21 +60,33 @@ namespace Serialization
 		{
 			startLoad();
 			object? result;
+			int length;
+			int lebLength;
 			int classID = LEB128.FromBytes(obj, out int readerHead);
 			if (classID == 0)
 				return null;
+			if(classID == -1)
+			{
+				length = LEB128.FromBytes(obj[readerHead..], out lebLength);
+				readerHead += lebLength;
+				string fullName = deserializeObject<string>(obj[readerHead..(readerHead + length)]);
+				readerHead += length;
+				length = LEB128.FromBytes(obj[readerHead..], out lebLength);
+				readerHead += lebLength;
+				Type type = Type.GetType(fullName);
+				return deserializeObject(obj[readerHead..(readerHead + length)], type);
+			}
 			if (!_idKey.ContainsKey(classID))
 				throw new Exception($"No class with ID: {classID} exists.");
 			Type objectType = _idKey[classID];
 			result = objectType.GetConstructor([]).Invoke([]);
 			PropertyInfo[] infos = _propertyInfos[objectType];
 			PropertyInfo currentMember;
-			int length;
 			string memberName = "";
 			object? value;
 			while (readerHead < obj.Length)
 			{
-				length = LEB128.FromBytes(obj[readerHead..], out int lebLength);
+				length = LEB128.FromBytes(obj[readerHead..], out lebLength);
 				readerHead += lebLength;
 				memberName = deserializeObject<string>(obj[readerHead..(readerHead + length)]);
 				readerHead += length;
