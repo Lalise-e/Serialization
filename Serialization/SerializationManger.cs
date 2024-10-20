@@ -1,8 +1,6 @@
 ﻿using Serialization.attributes;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
-using System.Reflection.Emit;
 
 namespace Serialization
 {

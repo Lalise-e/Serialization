@@ -1,5 +1,4 @@
-﻿
-namespace Serialization.typeHandlers
+﻿namespace Serialization.typeHandlers
 {
 	internal class BoolSerializer : ISerialization
 	{

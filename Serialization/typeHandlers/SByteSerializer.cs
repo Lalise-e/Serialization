@@ -1,6 +1,4 @@
-﻿
-
-namespace Serialization.typeHandlers
+﻿namespace Serialization.typeHandlers
 {
 	internal class SByteSerializer : ISerialization
 	{

@@ -1,7 +1,4 @@
-﻿
-
-
-namespace Serialization.typeHandlers
+﻿namespace Serialization.typeHandlers
 {
 	internal class CharSerializer : ISerialization
 	{
