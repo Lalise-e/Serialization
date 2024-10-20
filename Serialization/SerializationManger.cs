@@ -31,7 +31,7 @@ namespace Serialization
 			if (!_propertyInfos.ContainsKey(obj.GetType()))
 			{
 				if (!_serializers.ContainsKey(obj.GetType()))
-				throw new Exception($"class {obj.GetType()} is missing {nameof(ClassSerializationAttribute)}");
+					throw new Exception($"class {obj.GetType()} is missing {nameof(ClassSerializationAttribute)}");
 				result.AddRange(((LEB128)(-1)).GetBytes());
 				result.AddRange(serializeObject(obj.GetType().AssemblyQualifiedName, true));
 				result.AddRange(serializeObject(obj, true));
