@@ -54,8 +54,7 @@ namespace Serialization
 		{
 			startLoad();
 			object? result;
-			int readerHead = 0;
-			int classID = LEB128.FromBytes(obj, out readerHead);
+			int classID = LEB128.FromBytes(obj, out int readerHead);
 			if (classID == 0)
 				return null;
 			if (!_idKey.ContainsKey(classID))
