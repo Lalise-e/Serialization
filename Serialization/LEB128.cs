@@ -23,7 +23,6 @@ namespace Serialization
 				//So, I was not actually aware of how negative intergers were stored prior to this,
 				//I just assumed the MSB denoted wheather or not the number was negative and that everything
 				//else was normal, but no, the negative number is the complement to its positive counterpart.
-				newValue = (~newValue) + 1;
 				newValue = (newValue << 1) + 1;
 			}
 			else
@@ -56,8 +55,8 @@ namespace Serialization
 			}
 			if (value % 2 == 0)
 				return (long)(value >> 1);
-			value = value >> 1;
-			return (long)~(value - 1);
+			value = (value >> 1) + ((ulong)1 << 63);
+			return (long)~value;
 		}
 		public byte[] GetBytes()
 		{
