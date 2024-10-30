@@ -14,6 +14,8 @@ namespace Serialization
 		private static readonly Dictionary<Type, ISerialization> _serializers = [];
 		private static readonly Dictionary<Type, PropertyInfo[]> _propertyInfos = [];
 		private static readonly Dictionary<int, Type> _idKey = [];
+		private static readonly List<object> _instances = new();
+		private static int _depth = 0;
 		public static T? LoadObjectFromFile<T>(string path)
 		{
 			return (T)Deserialize(File.ReadAllBytes(path));
@@ -24,6 +26,7 @@ namespace Serialization
 		}
 		public static byte[] Serialize(object obj)
 		{
+			_depth++;
 			startLoad();
 			if (obj == null)
 				return ((LEB128)0).GetBytes();
@@ -35,6 +38,9 @@ namespace Serialization
 				result.AddRange(((LEB128)(-1)).GetBytes());
 				result.AddRange(serializeObject(obj.GetType().AssemblyQualifiedName, true));
 				result.AddRange(serializeObject(obj, true));
+				_depth--;
+				if(_depth == 0)
+					_instances.Clear();
 				return result.ToArray();
 			}
 
@@ -46,10 +52,16 @@ namespace Serialization
 			result.AddRange(((LEB128)classAtt.ClassID).GetBytes());
 			foreach (PropertyInfo info in _propertyInfos[obj.GetType()])
 			{
-				result.AddRange(serializeObject(
-					info.GetCustomAttribute<PropertySerializationAttribute>().PropertyName, true));
+				string name = "";
+				if (_instances.Contains(info.GetValue(obj, null)))
+					name += "\u0000";
+				name += info.GetCustomAttribute<PropertySerializationAttribute>().PropertyName;
+				result.AddRange(serializeObject(name,true));
 				result.AddRange(serializeObject(info.GetValue(obj), true));
 			}
+			_depth--;
+			if (_depth == 0)
+				_instances.Clear();
 			return result.ToArray();
 		}
 		public static T? Deserialize<T>(byte[] bytes)
@@ -58,6 +70,8 @@ namespace Serialization
 		}
 		public static object? Deserialize(byte[] obj)
 		{
+			//I am so terribly sorry to whoever has to read this.
+			_depth++;
 			startLoad();
 			object? result;
 			int length;
@@ -74,6 +88,9 @@ namespace Serialization
 				length = LEB128.FromBytes(obj[readerHead..], out lebLength);
 				readerHead += lebLength;
 				Type type = Type.GetType(fullName);
+				_depth--;
+				if (_depth == 0)
+					_instances.Clear();
 				return deserializeObject(obj[readerHead..(readerHead + length)], type);
 			}
 			if (!_idKey.ContainsKey(classID))
@@ -86,12 +103,18 @@ namespace Serialization
 			object? value;
 			while (readerHead < obj.Length)
 			{
+				bool isInstanced = false;
 				length = LEB128.FromBytes(obj[readerHead..], out lebLength);
 				readerHead += lebLength;
 				memberName = deserializeObject<string>(obj[readerHead..(readerHead + length)]);
 				readerHead += length;
 				if (memberName == null)
 					continue;
+				if (memberName[0] == '\0')
+				{
+					isInstanced = true;
+					memberName = memberName[1..];
+				}
 				currentMember = infos.ToList().Find(
 					p => p.GetCustomAttribute<PropertySerializationAttribute>().PropertyName == memberName);
 				if (currentMember == null)
@@ -106,42 +129,53 @@ namespace Serialization
 					currentMember.SetValue(result, null);
 					continue;
 				}
+				if (isInstanced)
+					value = instanceDeserializer(obj[readerHead..(readerHead + length)]);
+				else
 				value = deserializeObject(obj[readerHead..(readerHead + length)], currentMember.PropertyType);
 				readerHead += length;
 				currentMember.SetValue(result, value);
 			}
+			_depth--;
+			if (_depth == 0)
+				_instances.Clear();
 			return result;
 		}
 		private static byte[] serializeObject(object obj, bool includeLength = false)
 		{
 			List<byte> result = [];
-			Func<object, byte[]> serializer;
+			Func<object, byte[]> serializer = null;
 			LEB128 length = 0;
 			if (obj == null)
 			{
 				result.AddRange(length.GetBytes());
 				return result.ToArray();
 			}
+			if (_instances.Contains(obj))
+				serializer = instanceSerializer;
 			if (!_serializers.ContainsKey(obj.GetType()))
 			{
 				ClassSerializationAttribute? att = obj.GetType().GetCustomAttribute<ClassSerializationAttribute>();
 				if (att == null && !obj.GetType().IsArray)
 					throw new Exception($"type {obj.GetType().Name} is missing a serializer.");
-				else if (att == null)
+				else if ((att == null) && (serializer == null))
 					serializer = arraySerializer;
-				else
+				else if (serializer == null)
 					serializer = Serialize;
 			}
-			else
+			else if (serializer == null)
 				serializer = _serializers[obj.GetType()].Serialize;
 			byte[] buffer = serializer(obj);
 			if (includeLength)
 				result.AddRange(((LEB128)buffer.Length).GetBytes());
 			result.AddRange(buffer);
+			if ((!_instances.Contains(obj)) && obj is not string)
+				_instances.Add(obj);
 			return result.ToArray();
 		}
 		private static object? deserializeObject(byte[] data, Type type)
 		{
+			object? result;
 			if (data.Length == 0)
 				return null;
 			Func<byte[], object?> deserializer;
@@ -157,7 +191,10 @@ namespace Serialization
 			}
 			else
 				deserializer = _serializers[type].Deserialize;
-			return deserializer(data);
+			result = deserializer(data);
+			if (result is not string)
+				_instances.Add(result);
+			return result;
 		}
 		private static T? deserializeObject<T>(byte[] data)
 		{
@@ -222,6 +259,20 @@ namespace Serialization
 				goto IHateLabels;
 			}
 			return index;
+		}
+		private static byte[] instanceSerializer(object obj)
+		{
+			if (!_instances.Contains(obj))
+				throw new ArgumentException("object as not been cached");
+			int index = _instances.IndexOf(obj);
+			return ((LEB128)index).GetBytes();
+		}
+		private static object instanceDeserializer(byte[] data)
+		{
+			int index = LEB128.FromBytes(data, out int length);
+			if (_instances.Count <= index)
+				throw new ArgumentException("There is not an object associated with this index");
+			return _instances[index];
 		}
 		private static bool _loaded = false;
 		private static void startLoad()
