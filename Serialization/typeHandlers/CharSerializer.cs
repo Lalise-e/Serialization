@@ -4,6 +4,10 @@
 	{
 		public Type SerializationType { get { return typeof(char); } }
 
+		public bool IsStaticLength {  get { return true; } }
+
+		public int Length {  get { return 2; } }
+
 		public object? Deserialize(byte[] serializedBytes)
 		{
 			return (char)new UShortSerializer().Deserialize(serializedBytes);

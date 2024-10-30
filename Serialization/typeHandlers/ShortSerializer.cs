@@ -3,6 +3,9 @@
 	internal class ShortSerializer : ISerialization
 	{
 		public Type SerializationType { get { return typeof(short); } }
+		public bool IsStaticLength { get { return true; } }
+
+		public int Length { get { return 2; } }
 
 		public object? Deserialize(byte[] serializedBytes)
 		{

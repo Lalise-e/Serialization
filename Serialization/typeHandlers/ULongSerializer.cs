@@ -3,6 +3,9 @@
 	internal class ULongSerializer : ISerialization
 	{
 		public Type SerializationType { get { return typeof(ulong); } }
+		public bool IsStaticLength { get { return true; } }
+
+		public int Length { get { return 8; } }
 
 		public object? Deserialize(byte[] serializedBytes)
 		{

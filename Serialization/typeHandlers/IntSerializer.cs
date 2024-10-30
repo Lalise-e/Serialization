@@ -4,6 +4,10 @@
 	{
 		public Type SerializationType { get { return typeof(int); } }
 
+		public bool IsStaticLength { get { return true; } }
+
+		public int Length { get { return 4; } }
+
 		public object? Deserialize(byte[] serializedBytes)
 		{
 			return BitConverter.ToInt32(serializedBytes);
