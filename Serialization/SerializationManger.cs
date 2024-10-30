@@ -132,7 +132,7 @@ namespace Serialization
 				if (isInstanced)
 					value = instanceDeserializer(obj[readerHead..(readerHead + length)]);
 				else
-				value = deserializeObject(obj[readerHead..(readerHead + length)], currentMember.PropertyType);
+					value = deserializeObject(obj[readerHead..(readerHead + length)], currentMember.PropertyType);
 				readerHead += length;
 				currentMember.SetValue(result, value);
 			}
