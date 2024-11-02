@@ -52,12 +52,18 @@ namespace Serialization
 			result.AddRange(((LEB128)classAtt.ClassID).GetBytes());
 			foreach (PropertyInfo info in _propertyInfos[obj.GetType()])
 			{
+				bool includeLength = true;
 				string name = "";
 				if (_instances.Contains(info.GetValue(obj, null)))
+				{
 					name += "\u0000";
+					includeLength = false;
+				}
 				name += info.GetCustomAttribute<PropertySerializationAttribute>().PropertyName;
+				if (_serializers.ContainsKey(info.PropertyType) && !_instances.Contains(info.GetValue(obj)))
+					includeLength = !_serializers[info.PropertyType].IsStaticLength;
 				result.AddRange(serializeObject(name,true));
-				result.AddRange(serializeObject(info.GetValue(obj), true));
+				result.AddRange(serializeObject(info.GetValue(obj), includeLength));
 			}
 			_depth--;
 			if (_depth == 0)
@@ -79,7 +85,7 @@ namespace Serialization
 			int classID = LEB128.FromBytes(obj, out int readerHead);
 			if (classID == 0)
 				return null;
-			if(classID == -1)
+			if (classID == -1)
 			{
 				length = LEB128.FromBytes(obj[readerHead..], out lebLength);
 				readerHead += lebLength;
@@ -100,7 +106,7 @@ namespace Serialization
 			PropertyInfo[] infos = _propertyInfos[objectType];
 			PropertyInfo currentMember;
 			string memberName = "";
-			object? value;
+			object? value = null;
 			while (readerHead < obj.Length)
 			{
 				bool isInstanced = false;
@@ -108,6 +114,7 @@ namespace Serialization
 				readerHead += lebLength;
 				memberName = deserializeObject<string>(obj[readerHead..(readerHead + length)]);
 				readerHead += length;
+				length = 0;
 				if (memberName == null)
 					continue;
 				if (memberName[0] == '\0')
@@ -122,17 +129,23 @@ namespace Serialization
 					Debug.WriteLine($"Type {objectType.Name} is lacking a property with the name {memberName}");
 					continue;
 				}
-				length = LEB128.FromBytes(obj[readerHead..], out lebLength);
-				readerHead += lebLength;
-				if(length == 0)
+				if (_serializers.ContainsKey(currentMember.PropertyType) && !isInstanced)
+					if (_serializers[currentMember.PropertyType].IsStaticLength)
+						length = _serializers[currentMember.PropertyType].Length;
+				if (isInstanced)
+					value = instanceDeserializer(obj[readerHead..], out length);
+				if (length == 0)
+				{
+					length = LEB128.FromBytes(obj[readerHead..], out lebLength);
+					readerHead += lebLength;
+				}
+				if (length == 0)
 				{
 					currentMember.SetValue(result, null);
 					continue;
-				}
-				if (isInstanced)
-					value = instanceDeserializer(obj[readerHead..(readerHead + length)]);
-				else
-					value = deserializeObject(obj[readerHead..(readerHead + length)], currentMember.PropertyType);
+				}	
+				if(!isInstanced)
+					value = deserializeObject(obj[readerHead..(readerHead + length)], currentMember.PropertyType); ;
 				readerHead += length;
 				currentMember.SetValue(result, value);
 			}
@@ -169,7 +182,7 @@ namespace Serialization
 			if (includeLength)
 				result.AddRange(((LEB128)buffer.Length).GetBytes());
 			result.AddRange(buffer);
-			if ((!_instances.Contains(obj)) && obj is not string)
+			if ((!_instances.Contains(obj)) && obj is not string && obj.GetType().IsClass)
 				_instances.Add(obj);
 			return result.ToArray();
 		}
@@ -183,7 +196,14 @@ namespace Serialization
 			{
 				ClassSerializationAttribute? att = type.GetCustomAttribute<ClassSerializationAttribute>();
 				if (att == null && !type.IsArray)
-					throw new Exception($"type {type.Name} is missing a serializer.");
+				{
+					int id = LEB128.FromBytes(data, out int dump);
+					if (!_idKey.ContainsKey(id))
+						throw new Exception($"type {type.Name} is missing a serializer.");
+					if (!_idKey[id].IsAssignableTo(type))
+						throw new Exception($"{_idKey[id].Name} cannot be assigned to {type.Name}");
+					deserializer = Deserialize;
+				}
 				else if (att == null)
 					deserializer = bytes => arrayDeserializer(bytes, type.GetElementType());
 				else
@@ -192,8 +212,9 @@ namespace Serialization
 			else
 				deserializer = _serializers[type].Deserialize;
 			result = deserializer(data);
-			if (result is not string)
-				_instances.Add(result);
+			if (result is not null)
+				if (result is not string && result.GetType().IsClass)
+					_instances.Add(result);
 			return result;
 		}
 		private static T? deserializeObject<T>(byte[] data)
@@ -214,7 +235,13 @@ namespace Serialization
 			}
 			foreach(object o in array)
 			{
-				result.AddRange(serializeObject(o, true));
+				bool instance = false;
+				if(o is not null)
+					if(_instances.Contains(o))
+						instance = true;
+				bool includeLength = !instance;
+				result.AddRange(serializeObject(instance));
+				result.AddRange(serializeObject(o, includeLength));
 			}
 			return result.ToArray();
 		}
@@ -232,9 +259,22 @@ namespace Serialization
 			int[]? index = new int[rank];
 			while(index != null)
 			{
-				int length = LEB128.FromBytes(data[reader..], out lebLength);
-				reader += lebLength;
-				array.SetValue(deserializeObject(data[reader..(reader+length)],type), index);
+				bool instance = false;
+				if (deserializeObject<bool>(data[reader..(reader + 1)]))
+					instance = true;
+				reader++;
+				int length;
+
+				if (instance)
+				{
+					array.SetValue(instanceDeserializer(data[reader..], out length), index);
+				}
+				else
+				{
+					length = LEB128.FromBytes(data[reader..], out lebLength);
+					reader += lebLength;
+					array.SetValue(deserializeObject(data[reader..(reader + length)], type), index);
+				}
 				reader += length;
 				index = incrementIndex(lengths, index);
 			}
@@ -267,9 +307,9 @@ namespace Serialization
 			int index = _instances.IndexOf(obj);
 			return ((LEB128)index).GetBytes();
 		}
-		private static object instanceDeserializer(byte[] data)
+		private static object instanceDeserializer(byte[] data, out int length)
 		{
-			int index = LEB128.FromBytes(data, out int length);
+			int index = LEB128.FromBytes(data, out length);
 			if (_instances.Count <= index)
 				throw new ArgumentException("There is not an object associated with this index");
 			return _instances[index];
