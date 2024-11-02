@@ -17,7 +17,6 @@ namespace Serialization
 			int bytes = 0;
 			//This just moves the signed bit to be the least significant bit instead of the most significant one
 			//I will probably regret this.
-			Debug.WriteLine($"Bits: {newValue:B}");
 			if (value<0)
 			{
 				//So, I was not actually aware of how negative intergers were stored prior to this,
@@ -30,7 +29,6 @@ namespace Serialization
 			ulong valueCopy = newValue;
 			while (true)
 			{
-				Debug.WriteLine($"Value bits: {valueCopy:B}");
 				bytes += 1;
 				valueCopy = valueCopy >> 7;
 				if (valueCopy == 0)
