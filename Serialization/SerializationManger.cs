@@ -33,7 +33,7 @@ namespace Serialization
 			List<byte> result = [];
 			if (!_propertyInfos.ContainsKey(obj.GetType()))
 			{
-				if (!_serializers.ContainsKey(obj.GetType()))
+				if (!_serializers.ContainsKey(obj.GetType()) && !obj.GetType().IsArray)
 					throw new Exception($"class {obj.GetType()} is missing {nameof(ClassSerializationAttribute)}");
 				result.AddRange(((LEB128)(-1)).GetBytes());
 				result.AddRange(serializeObject(obj.GetType().AssemblyQualifiedName, true));
@@ -94,10 +94,11 @@ namespace Serialization
 				length = LEB128.FromBytes(obj[readerHead..], out lebLength);
 				readerHead += lebLength;
 				Type type = Type.GetType(fullName);
+				result = deserializeObject(obj[readerHead..(readerHead + length)], type);
 				_depth--;
 				if (_depth == 0)
 					_instances.Clear();
-				return deserializeObject(obj[readerHead..(readerHead + length)], type);
+				return result;
 			}
 			if (!_idKey.ContainsKey(classID))
 				throw new Exception($"No class with ID: {classID} exists.");
