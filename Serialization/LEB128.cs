@@ -2,6 +2,7 @@
 
 namespace Serialization
 {
+	[DebuggerDisplay("value = {leb128ToInt64()}")]
 	public struct LEB128
 	{
 		private byte[] _number = [128];
