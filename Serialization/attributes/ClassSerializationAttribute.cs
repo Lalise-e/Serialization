@@ -12,6 +12,8 @@ namespace Serialization.attributes
 		public int ClassID { get; set; }
 		public ClassSerializationAttribute(int classID)
 		{
+			if (classID <= 0)
+				throw new ArgumentException("class ID cannot be less or equal to 0");
 			ClassID = classID;
 		}
 	}
