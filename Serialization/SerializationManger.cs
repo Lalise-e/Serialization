@@ -6,9 +6,9 @@ namespace Serialization
 {
 	//[LEB128, classID]						<-	header, is -1 if object is null
 	//[LEB128, name length]					<-	serialized member, repeated for all marked members
-	//[string, memberName]				<-	serialized member, repeated for all marked members
+	//[string, memberName]					<-	serialized member, repeated for all marked members
 	//[LEB128, length of byte array]		<-	serialized member, repeated for all marked members
-	//[byte[], serialized member]		<-	serialized member, repeated for all marked members
+	//[byte[], serialized member]			<-	serialized member, repeated for all marked members
 	public static class SerializationManager
 	{
 		private static readonly Dictionary<Type, ISerialization> _serializers = [];
