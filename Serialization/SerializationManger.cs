@@ -9,13 +9,20 @@ namespace Serialization
 	//[string, memberName]					<-	serialized member, repeated for all marked members
 	//[LEB128, length of byte array]		<-	serialized member, repeated for all marked members
 	//[byte[], serialized member]			<-	serialized member, repeated for all marked members
-	public static class SerializationManager
+	public class SerializationManager
 	{
 		private static readonly Dictionary<Type, ISerialization> _serializers = [];
 		private static readonly Dictionary<Type, PropertyInfo[]> _propertyInfos = [];
 		private static readonly Dictionary<int, Type> _idKey = [];
-		private static readonly List<object> _instances = new();
-		private static int _depth = 0;
+		private static readonly List<SerializationManager> _managers = [];
+
+		private readonly List<object> _instances = new();
+		private int _depth = 0;
+		private bool inUse = true;
+		private SerializationManager()
+		{
+
+		}
 		public static T? LoadObjectFromFile<T>(string path)
 		{
 			return (T)Deserialize(File.ReadAllBytes(path));
@@ -24,7 +31,54 @@ namespace Serialization
 		{
 			File.WriteAllBytes(path, Serialize(obj));
 		}
+		public static T? Deserialize<T>(byte[] bytes)
+		{
+			return (T)Deserialize(bytes);
+		}
 		public static byte[] Serialize(object obj)
+		{
+			SerializationManager manager = getManager();
+			Stopwatch sw = Stopwatch.StartNew();
+			byte[] result = manager.serialize(obj);
+			manager.inUse = false;
+			sw.Stop();
+			Debug.WriteLine($"Serializsed object of type {obj.GetType().Name} in {sw.ElapsedMilliseconds}ms ({sw.ElapsedTicks}).");
+			return result;
+		}
+		public static object? Deserialize(byte[] obj)
+		{
+			SerializationManager manager = getManager();
+			Stopwatch sw = Stopwatch.StartNew();
+			object? result = manager.deserialize(obj);
+			manager.inUse = false;
+			sw.Stop();
+			Debug.WriteLine($"Deserializsed object of type {result.GetType().Name} in {sw.ElapsedMilliseconds}ms ({sw.ElapsedTicks}).");
+			return result;
+		}
+		private static bool fetchingManager = false;
+		private static SerializationManager getManager()
+		{
+			while (fetchingManager)
+				Thread.Sleep(1);
+			fetchingManager = true;
+			int count = _managers.Count;
+			SerializationManager manager = null;
+			for (int i = 0; i < count; i++)
+			{
+				if (!_managers[i].inUse)
+				{
+					manager = _managers[i];
+					manager.inUse = true;
+					break;
+				}
+			}
+			if (manager == null)
+				manager = new();
+			_managers.Add(manager);
+			fetchingManager = false;
+			return manager;
+		}
+		private byte[] serialize(object obj)
 		{
 			_depth++;
 			startLoad();
@@ -70,11 +124,7 @@ namespace Serialization
 				_instances.Clear();
 			return result.ToArray();
 		}
-		public static T? Deserialize<T>(byte[] bytes)
-		{
-			return (T)Deserialize(bytes);
-		}
-		public static object? Deserialize(byte[] obj)
+		private object? deserialize(byte[] obj)
 		{
 			//I am so terribly sorry to whoever has to read this.
 			_depth++;
@@ -155,7 +205,7 @@ namespace Serialization
 				_instances.Clear();
 			return result;
 		}
-		private static byte[] serializeObject(object obj, bool includeLength = false)
+		private byte[] serializeObject(object obj, bool includeLength = false)
 		{
 			List<byte> result = [];
 			Func<object, byte[]> serializer = null;
@@ -167,17 +217,17 @@ namespace Serialization
 			}
 			if (_instances.Contains(obj))
 				serializer = instanceSerializer;
-			if (!_serializers.ContainsKey(obj.GetType()))
+			else if (!_serializers.ContainsKey(obj.GetType()))
 			{
 				ClassSerializationAttribute? att = obj.GetType().GetCustomAttribute<ClassSerializationAttribute>();
 				if (att == null && !obj.GetType().IsArray)
 					throw new Exception($"type {obj.GetType().Name} is missing a serializer.");
-				else if ((att == null) && (serializer == null))
+				else if (att == null)
 					serializer = arraySerializer;
-				else if (serializer == null)
-					serializer = Serialize;
+				else
+					serializer = serialize;
 			}
-			else if (serializer == null)
+			else
 				serializer = _serializers[obj.GetType()].Serialize;
 			byte[] buffer = serializer(obj);
 			if (includeLength)
@@ -187,7 +237,7 @@ namespace Serialization
 				_instances.Add(obj);
 			return result.ToArray();
 		}
-		private static object? deserializeObject(byte[] data, Type type)
+		private object? deserializeObject(byte[] data, Type type)
 		{
 			object? result;
 			if (data.Length == 0)
@@ -203,12 +253,12 @@ namespace Serialization
 						throw new Exception($"type {type.Name} is missing a serializer.");
 					if (!_idKey[id].IsAssignableTo(type))
 						throw new Exception($"{_idKey[id].Name} cannot be assigned to {type.Name}");
-					deserializer = Deserialize;
+					deserializer = deserialize;
 				}
 				else if (att == null)
 					deserializer = bytes => arrayDeserializer(bytes, type.GetElementType());
 				else
-					deserializer = Deserialize;
+					deserializer = deserialize;
 			}
 			else
 				deserializer = _serializers[type].Deserialize;
@@ -218,11 +268,11 @@ namespace Serialization
 					_instances.Add(result);
 			return result;
 		}
-		private static T? deserializeObject<T>(byte[] data)
+		private T? deserializeObject<T>(byte[] data)
 		{
 			return (T)deserializeObject(data, typeof(T));
 		}
-		private static byte[] arraySerializer(object obj)
+		private byte[] arraySerializer(object obj)
 		{
 			if (!obj.GetType().IsArray)
 				throw new ArgumentException("Object is not an array");
@@ -246,7 +296,7 @@ namespace Serialization
 			}
 			return result.ToArray();
 		}
-		private static object arrayDeserializer(byte[] data, Type type)
+		private object arrayDeserializer(byte[] data, Type type)
 		{
 			int rank = LEB128.FromBytes(data, out int lebLength);
 			int reader = lebLength;
@@ -301,14 +351,14 @@ namespace Serialization
 			}
 			return index;
 		}
-		private static byte[] instanceSerializer(object obj)
+		private byte[] instanceSerializer(object obj)
 		{
 			if (!_instances.Contains(obj))
 				throw new ArgumentException("object as not been cached");
 			int index = _instances.IndexOf(obj);
 			return ((LEB128)index).GetBytes();
 		}
-		private static object instanceDeserializer(byte[] data, out int length)
+		private object instanceDeserializer(byte[] data, out int length)
 		{
 			int index = LEB128.FromBytes(data, out length);
 			if (_instances.Count <= index)
