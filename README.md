@@ -5,20 +5,17 @@ developed for my own future use.
 
 ## Serialization
 
-So there are two methods as of writing this to serialize an instance of an object and those are SerializationManager.Serialize() and SerializationManager.SaveToFile().  
-Serialize() gives you back a byte array and SaveToFile() does the same thing but it just saves it to a specificed location instead of giving you the bytes.
+SerializationManager.Serialize() contains overloads for either writing the serialized bytes directly to disk or it can also return the byte array directly.
 
 ## Deserialization
 
-With deserialization there are a few more options compared to serialization. There are two main methods and those Deserialize() and LoadObjectFromFile().  
-Deserialize takes the byte array you got from Serialize() and LoadObjectFromFile() reads bytes from a file. They both give you back an object that will be mostly identical to what you put in with the exception of references.  
-Because of either technical limitations or my own incompetence any references will be copied so if you have to properties pointing to the same instance on the heap before serialization, after deserialization they will now be seperate objects.  
-
-Both Deserialization methods also accept generics that will just do a cast for you.  
+SerializationManager.Deserialize() contains overloads for either loading an object from a file location or from a byte array.
+Said object will be internally consistent with the one that got serialized.
+SerializationManager.Deserialize() also accept generics.
 
 ## How to set up a class
 
-If you throw any object into Serialize() you will most likely get an exception. That is because it will only try and serialize classes with a ClassSerializationAttribute or if they have ISerialization interface.  
+Mark a class that you want to be able to (de)serialize with ClassSerializationAttribute and any properties you want (de)serialized with PropertySerializationAttribute.
 
 ### ClassSerializationAttribute
 
@@ -28,8 +25,8 @@ Keep the ID unique and greater than 0.
 
 ### PropertySerializationAttribute
 
-So now the (De)serializer knows that the class is safe to (De)serialize it still has the problem of not knowing which properties it should touch.  
-This is where PropertySerializationAttribute comes in, the (De)serializer will (De)serialize any properties with the PropertySerializationAttribute.  
+So now the (de)serializer knows that the class is safe to (de)serialize it still has the problem of not knowing which properties it should touch.  
+This is where PropertySerializationAttribute comes in, the (de)serializer will (de)serialize any properties with the PropertySerializationAttribute.  
 The name property of the attribute is used by the deserializer to know what property it is currently deserializing so keep these unique within a single class.
 Two different classes can both have attributes with the same name without any issues but a single class cannot have 2 attributes the same name.
 
@@ -41,7 +38,7 @@ So if you want to make your own it will be used as long as it is in the domain w
 
 ### ISerialization.SerializationType
 
-SerializationType just the type that this class will be used to (De)serialize.
+SerializationType just the type that this class will be used to (de)serialize.
 
 ### ISerialization.Serialize
 
