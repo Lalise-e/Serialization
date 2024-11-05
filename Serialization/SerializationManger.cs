@@ -23,17 +23,9 @@ namespace Serialization
 		{
 
 		}
-		public static T? LoadObjectFromFile<T>(string path)
-		{
-			return (T)Deserialize(File.ReadAllBytes(path));
-		}
-		public static void SaveToFile(string path, object? obj)
+		public static void Serialize(string path, object? obj)
 		{
 			File.WriteAllBytes(path, Serialize(obj));
-		}
-		public static T? Deserialize<T>(byte[] bytes)
-		{
-			return (T)Deserialize(bytes);
 		}
 		public static byte[] Serialize(object obj)
 		{
@@ -44,6 +36,18 @@ namespace Serialization
 			sw.Stop();
 			Debug.WriteLine($"Serializsed object of type {obj.GetType().Name} in {sw.ElapsedMilliseconds}ms ({sw.ElapsedTicks}).");
 			return result;
+		}
+		public static T? Deserialize<T>(byte[] bytes)
+		{
+			return (T)Deserialize(bytes);
+		}
+		public static T? Deserialize<T>(string path)
+		{
+			return (T)Deserialize(path);
+		}
+		public static object? Deserialize(string path)
+		{
+			return Deserialize(File.ReadAllBytes(path));
 		}
 		public static object? Deserialize(byte[] obj)
 		{
