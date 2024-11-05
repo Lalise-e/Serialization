@@ -43,11 +43,17 @@ namespace Serialization
 		public static byte[] Serialize(object obj)
 		{
 			SerializationManager manager = getManager();
+			byte[] result;
+#if DEBUG
 			Stopwatch sw = Stopwatch.StartNew();
-			byte[] result = manager.serialize(obj);
+			result = manager.serialize(obj);
 			manager.inUse = false;
 			sw.Stop();
 			Debug.WriteLine($"Serializsed object of type {obj.GetType().Name} in {sw.ElapsedMilliseconds}ms ({sw.ElapsedTicks}).");
+#endif
+#if RELEASE
+			result = manager.serialize(obj);
+#endif
 			return result;
 		}
 		/// <summary>
@@ -87,11 +93,17 @@ namespace Serialization
 		public static object? Deserialize(byte[] obj)
 		{
 			SerializationManager manager = getManager();
+			object? result;
+#if DEBUG
 			Stopwatch sw = Stopwatch.StartNew();
-			object? result = manager.deserialize(obj);
+			result = manager.deserialize(obj);
 			manager.inUse = false;
 			sw.Stop();
 			Debug.WriteLine($"Deserializsed object of type {result.GetType().Name} in {sw.ElapsedMilliseconds}ms ({sw.ElapsedTicks}).");
+#endif
+#if RELEASE
+			result = manager.deserialize(obj);
+#endif
 			return result;
 		}
 		private static bool fetchingManager = false;
