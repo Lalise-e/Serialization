@@ -9,6 +9,9 @@ namespace Serialization
 	//[string, memberName]					<-	serialized member, repeated for all marked members
 	//[LEB128, length of byte array]		<-	serialized member, repeated for all marked members
 	//[byte[], serialized member]			<-	serialized member, repeated for all marked members
+	/// <summary>
+	/// Class that provides methods for robust and general Serialization/Deserialization.
+	/// </summary>
 	public class SerializationManager
 	{
 		private static readonly Dictionary<Type, ISerialization> _serializers = [];
@@ -23,10 +26,20 @@ namespace Serialization
 		{
 
 		}
+		/// <summary>
+		/// Serializes an object and saves it to the specified location.
+		/// </summary>
+		/// <param name="path">The file location, will be overwritten if it already exists.</param>
+		/// <param name="obj">Object that will be serialized.</param>
 		public static void Serialize(string path, object? obj)
 		{
 			File.WriteAllBytes(path, Serialize(obj));
 		}
+		/// <summary>
+		/// Serializes an object and returns it as a byte array.
+		/// </summary>
+		/// <param name="obj">Object that will be serialized</param>
+		/// <returns>Byte array of the serialized object.</returns>
 		public static byte[] Serialize(object obj)
 		{
 			SerializationManager manager = getManager();
@@ -37,18 +50,40 @@ namespace Serialization
 			Debug.WriteLine($"Serializsed object of type {obj.GetType().Name} in {sw.ElapsedMilliseconds}ms ({sw.ElapsedTicks}).");
 			return result;
 		}
+		/// <summary>
+		/// Deserializes a byte array into relevant object.
+		/// </summary>
+		/// <typeparam name="T">The object type of the serialized object.</typeparam>
+		/// <param name="bytes">Byte array to deserialize</param>
+		/// <returns>A deserialized object.</returns>
 		public static T? Deserialize<T>(byte[] bytes)
 		{
 			return (T)Deserialize(bytes);
 		}
+		/// <summary>
+		/// Reads a file and deserializes it into an object.
+		/// </summary>
+		/// <typeparam name="T">The object type of the serialized object.</typeparam>
+		/// <param name="path">The file to be deserialized.</param>
+		/// <returns>A deserialized object.</returns>
 		public static T? Deserialize<T>(string path)
 		{
 			return (T)Deserialize(path);
 		}
+		/// <summary>
+		/// Reads a file and deserializes it into an object.
+		/// </summary>
+		/// <param name="path">The file to be deserialized.</param>
+		/// <returns>A deserialized object.</returns>
 		public static object? Deserialize(string path)
 		{
 			return Deserialize(File.ReadAllBytes(path));
 		}
+		/// <summary>
+		/// Deserializes a byte array into relevant object.
+		/// </summary>
+		/// <param name="obj">Byte array to deserialize</param>
+		/// <returns>A deserialized object.</returns>
 		public static object? Deserialize(byte[] obj)
 		{
 			SerializationManager manager = getManager();
