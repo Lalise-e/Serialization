@@ -1,6 +1,6 @@
 # Serialisation
 
-This is a library to used handle the serialization and deserialization of instanced classes
+This is a library used to handle the serialization and deserialization of instanced classes
 developed for my own future use.  
 
 ## Serialization
