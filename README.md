@@ -35,6 +35,7 @@ Two different classes can both have attributes with the same name without any is
 ISerialization is an interface used by both the serializer and the deserializer quite heavily. It is primarily used for properties but it will also be attempted to be used for classes that miss a ClassSerializationAttribute.  
 When either SerializationManager.Serialize() or SerializationManager.Deserialize() are called for the first time every class with the ISerialization interface are loaded into a dictionary to be used by the (de)serializer.
 So if you want to make your own it will be used as long as it is in the domain when either of those methods are called for the first time.
+Priority will also be given to external classes, so you can overwrite something like StringSerializer if you want and the code will go with your version.
 
 ### ISerialization.SerializationType
 
