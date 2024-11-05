@@ -456,8 +456,27 @@ namespace Serialization
 			ConstructorInfo constructor = type.GetConstructor(Array.Empty<Type>()) ??
 				throw new Exception($"{type.FullName} is missing a constructor with 0 arguments");
 			ISerialization serializer = (ISerialization)constructor.Invoke(Array.Empty<object>());
-			_serializers.Add(serializer.SerializationType, serializer);
-			Debug.WriteLine("Serializer loaded for:\t" + serializer.SerializationType.Name);
+
+			//Checks if type is a dupe and overwrites the one in typeHandlers if they are duplicates.
+			if (_serializers.ContainsKey(serializer.SerializationType))
+			{
+				Assembly local = typeof(ISerialization).Assembly;
+				if (_serializers[serializer.SerializationType].GetType().Assembly == local)
+				{
+					_serializers.Remove(serializer.SerializationType);
+					_serializers.Add(serializer.SerializationType, serializer);
+					Debug.WriteLine("Serializer loaded for:\t" + serializer.SerializationType.Name);
+				}
+				else if (type.Assembly != local)
+					throw new Exception($"There are conflicting ISerialization classes for {serializer.SerializationType} " +
+						$"\"{_serializers[serializer.SerializationType].GetType().FullName}\" and \"{type.FullName}\" " +
+						$"are conflicting.");
+			}
+			else //No dupes just add as normal
+			{
+				_serializers.Add(serializer.SerializationType, serializer);
+				Debug.WriteLine("Serializer loaded for:\t" + serializer.SerializationType.Name);
+			}
 		}
 	}
 }
