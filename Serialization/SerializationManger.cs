@@ -47,13 +47,13 @@ namespace Serialization
 #if DEBUG
 			Stopwatch sw = Stopwatch.StartNew();
 			result = manager.serialize(obj);
-			manager.inUse = false;
 			sw.Stop();
 			Debug.WriteLine($"Serializsed object of type {obj.GetType().Name} in {sw.ElapsedMilliseconds}ms ({sw.ElapsedTicks}).");
 #endif
 #if RELEASE
 			result = manager.serialize(obj);
 #endif
+			manager.inUse = false;
 			return result;
 		}
 		/// <summary>
@@ -97,13 +97,13 @@ namespace Serialization
 #if DEBUG
 			Stopwatch sw = Stopwatch.StartNew();
 			result = manager.deserialize(obj);
-			manager.inUse = false;
 			sw.Stop();
 			Debug.WriteLine($"Deserializsed object of type {result.GetType().Name} in {sw.ElapsedMilliseconds}ms ({sw.ElapsedTicks}).");
 #endif
 #if RELEASE
 			result = manager.deserialize(obj);
 #endif
+			manager.inUse = false;
 			return result;
 		}
 		private static bool fetchingManager = false;
